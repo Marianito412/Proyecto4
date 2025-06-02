@@ -1,168 +1,105 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define MAX_N 100
+#define MAX_SOLUTIONS 10000
 
-int w[MAX_N];       // Vector de números
-int include[MAX_N]; // Vector de inclusión
-int n;              // Cantidad de números
-int W;              // Suma objetivo
-int delta;          // Valor delta para la variante 2
-int total_nodes;    // Contador de nodos visitados
-int solution_count; // Contador de soluciones
+static int w[MAX_N];                     // Pesos de los votantes
+static int include[MAX_N];               // Vector para marcar inclusión en la coalición actual
+static int n;                            // Número de votantes
+static int W;                            // Cuota mínima para que una coalición gane
+static int critical_votes[MAX_N];        // Contador de votos críticos por votante
+static int total_nodes;                  // Número de nodos explorados
+static int solution_count;               // Número total de coaliciones ganadoras encontradas
 
-void (*reportSolution)();
+// Matriz para guardar las coaliciones ganadoras (0 o 1 por votante)
+static int winning_coalitions[MAX_SOLUTIONS][MAX_N];
+static int coalitions_stored;            // Cuántas coaliciones hemos guardado
 
-// Función para ordenar de mayor a menor
-void sort_descending() {
-    for (int i = 0; i < n-1; i++) {
-        for (int j = i+1; j < n; j++) {
-            if (w[i] < w[j]) {
-                int temp = w[i];
-                w[i] = w[j];
-                w[j] = temp;
-            }
-        }
-    }
-}
 
-// Función para imprimir una solución
-void print_solution() {
-    reportSolution();
-    /*
-    int counter = 0;
-    printf("{ ");
-    for (int i = 0; i < n; i++) {
-        if (include[i]) {
-            printf("%d ", w[i]);
-            counter += w[i];
-        }
-    }
-    printf("} %d\n", counter);
-    */
-}
-
-// Promising para básica, suma mayor o igual y suma mayor o igual acotada
-int promising(int current_sum, int remaining) {
+static int promising(int current_sum, int remaining) {
     return current_sum + remaining >= W;
 }
 
-// Promising para suma exacta
-int promising_exact(int current_sum, int remaining) {
-    return current_sum <= W && current_sum + remaining >= W;
-}
-
-// Promising para suma en rango
-int promising_range(int current_sum, int remaining) {
-    int lower = W - delta;
-    int upper = W + delta;
-    
-    return (current_sum + remaining >= lower) && (current_sum <= upper);
-}
-
-// Variante 1: Básica
-void subset_sum_exact(int i, int current_sum, int remaining) {
-    total_nodes++;
-
-    if (current_sum == W) {
-        print_solution();
-        solution_count++;
-        return;
+static void reportSolution() {
+    int sum = 0;
+    for (int i = 0; i < n; i++) {
+        if (include[i]) sum += w[i];
     }
 
-    // Si pasamos del final, nos pasamos de la suma o no hay posibilidad
-    if (i >= n || current_sum > W || !promising_exact(current_sum, remaining)) {
-        return;
-    }
-
-    // Incluir w[i]
-    include[i] = 1;
-    subset_sum_exact(i + 1, current_sum + w[i], remaining - w[i]);
-
-    // Excluir w[i]
-    include[i] = 0;
-    subset_sum_exact(i + 1, current_sum, remaining - w[i]);
-}
-
-// Variante 2: Δ (delta) para rango
-void subset_sum_range(int i, int current_sum, int remaining) {
-    total_nodes++;
-
-    // Solo verifica la solución cuando llega al final de un camino
-    if (i == n) {
-        if (current_sum >= (W - delta) && current_sum <= (W + delta)) {
-            // Asegura que las soluciones no se repitan
-            print_solution();
-            solution_count++;
+    for (int i = 0; i < n; i++) {
+        if (include[i]) {
+            int sum_without_i = sum - w[i];
+            if (sum_without_i < W) {
+                critical_votes[i]++;
+            }
         }
-        return;
     }
 
-    // Poda: si no alcanza el mínimo o ya supera el máximo
-    if (!promising_range(current_sum, remaining)) {
-        return;
+    if (coalitions_stored < MAX_SOLUTIONS) {
+        memcpy(winning_coalitions[coalitions_stored], include, n * sizeof(int));
+        coalitions_stored++;
     }
-
-    // Incluir w[i] solo si supera el límite superior
-    if (current_sum + w[i] <= W + delta) {
-        include[i] = 1;
-        subset_sum_range(i + 1, current_sum + w[i], remaining - w[i]);
-    }
-
-    // No incluir w[i]
-    include[i] = 0;
-    subset_sum_range(i + 1, current_sum, remaining - w[i]);
 }
 
-
-// Variante 3: Mayor o igual
-void subset_sum_ge(int i, int current_sum, int remaining) {
+// Función recursiva para explorar todas las coaliciones cuya suma sea >= W
+static void subset_sum_ge(int i, int current_sum, int remaining) {
     total_nodes++;
-    
+
     if (i == n) {
         if (current_sum >= W) {
-            print_solution();
+            reportSolution();
             solution_count++;
         }
         return;
     }
 
-    // Poda: si ni sumando todos los elementos restantes se puede llegar a W
-    if (!promising(current_sum, remaining)) {
-        return;
-    }
+    if (!promising(current_sum, remaining)) return;
 
-    // Incluir w[i]
+    // Incluye al votante i
     include[i] = 1;
     subset_sum_ge(i + 1, current_sum + w[i], remaining - w[i]);
 
-    // No incluir w[i]
+    // No incluye al votante i
     include[i] = 0;
     subset_sum_ge(i + 1, current_sum, remaining - w[i]);
 }
 
-// Variante 4: Mayor o igual acotada
-void subset_sum_ge_bounded(int i, int current_sum, int remaining) {
-    total_nodes++;
+void banzhaf(int num_voters, int quota, int* weights) {
+    n = num_voters;
+    W = quota;
+    memcpy(w, weights, n * sizeof(int));
+    memset(include, 0, sizeof(include));
+    memset(critical_votes, 0, sizeof(critical_votes));
+    total_nodes = 0;
+    solution_count = 0;
+    coalitions_stored = 0;
 
-    // Si ya alcanza la suma requerida
-    if (current_sum >= W) {
-        print_solution();
-        solution_count++;
-        return;
+    int total = 0;
+    for (int i = 0; i < n; i++) total += w[i];
+
+    subset_sum_ge(0, 0, total);
+}
+
+void banzhaf_get_critical_votes(int* out_critical_votes) {
+    if (out_critical_votes != NULL) {
+        memcpy(out_critical_votes, critical_votes, n * sizeof(int));
     }
+}
 
-    // Si ya no hay más elementos, o no se puede llegar a W, termina
-    if (i == n || !promising(current_sum, remaining)) {
-        return;
+int banzhaf_get_total_nodes() {
+    return total_nodes;
+}
+
+int banzhaf_get_solution_count() {
+    return solution_count;
+}
+
+// Retorna las coaliciones guardadas y la cantidad total
+// *out_coalitions debe ser un puntero a un array de arrays de int 
+int banzhaf_get_coalitions(int*** out_coalitions) {
+    if (out_coalitions != NULL) {
+        *out_coalitions = winning_coalitions;
     }
-
-    // Incluir w[i]
-    include[i] = 1;
-    subset_sum_ge_bounded(i + 1, current_sum + w[i], remaining - w[i]);
-
-    // No incluir w[i]
-    include[i] = 0;
-    subset_sum_ge_bounded(i + 1, current_sum, remaining - w[i]);
+    return coalitions_stored;
 }
