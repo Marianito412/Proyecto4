@@ -336,7 +336,6 @@ static gboolean drawInput(GtkWidget *widget, cairo_t *cr) {
     cairo_move_to(cr,0,0);
     float currentWidth = 0;
     for(int i=0; i<n; i++){
-        
         float prop = ((float)w[i]/(float)Total);
         printf("Value: %d ", w[i]);
         printf("Prop: %f ", prop);
