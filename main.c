@@ -22,6 +22,34 @@ GtkSpinButton* spinRange = NULL;
 GtkScrolledWindow* scrollBox = NULL;
 GtkLabel* resultsLabel = NULL;
 
+GtkDrawingArea* InputArea = NULL;
+GtkLabel* InputLabel = NULL;
+
+void UpdateModel(){
+    int Total = 0;
+
+    for(int i=0; i<n; i++){
+        printf("%d", w[i]);
+        Total+=w[i];
+    }
+    char Model[100];
+    sprintf(Model, "K(%d;", Total);
+    
+    for(int i=0; i<n; i++){
+        char voter[10];
+        if (i >= n-1){
+            sprintf(voter, " %d", w[i]);
+        }
+        else{
+            sprintf(voter, " %d,", w[i]);
+        }
+        strcat(Model, voter);
+    }
+    strcat(Model, ")");
+
+    gtk_label_set_text(InputLabel, Model);
+}
+
 GtkBox* generate_row(){
     GtkBox* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
     int counter = 0;
@@ -170,9 +198,11 @@ int Test() {  // SE PUEDE ELIMINAR ESTO, SOLO ES PARA PRUEBAS
 void OnSetChanged(GtkSpinButton* Button, gpointer UserData){
     LoadNumbers();
     ClampRange();
+    UpdateModel();
 
     int value = gtk_spin_button_get_value_as_int(spinRange);
     delta = value;
+    gtk_widget_queue_draw(GTK_WIDGET(InputArea));
     //printf("NewRange: %d\n", delta);
 }
 
@@ -272,6 +302,58 @@ void onBeginExecute(GtkButton* Button, gpointer UserData){
 
 }
 
+static gboolean drawInput(GtkWidget *widget, cairo_t *cr) {
+
+    GdkRGBA test[] = {
+        {0.0, 0.0, 0.0, 1.0},
+        {0.0, 0.0, 1.0, 1.0},
+        {0.0, 1.0, 0.0, 1.0},
+        {0.0, 1.0, 1.0, 1.0},
+        {1.0, 0.0, 0.0, 1.0},
+        {1.0, 0.0, 1.0, 1.0},
+        {1.0, 1.0, 0.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0},
+        {1.0, 1.0, 0.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0},
+        {1.0, 1.0, 0.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0}
+    };
+
+    int width = gtk_widget_get_allocated_width(widget);
+    int height = gtk_widget_get_allocated_height(widget);
+    int Total = 0;
+
+    LoadNumbers();
+
+    for(int i=0; i<n; i++){
+        printf("%d ", w[i]);
+        Total+=w[i];
+    }
+    printf(" %d \n", Total);
+    cairo_set_source_rgb(cr, 1, 1, 1);  // Fondo negro (puedes cambiarlo)
+    cairo_paint(cr);  // Llena toda la superficie con el color de fondo
+
+    cairo_move_to(cr,0,0);
+    float currentWidth = 0;
+    for(int i=0; i<n; i++){
+        
+        float prop = ((float)w[i]/(float)Total);
+        printf("Value: %d ", w[i]);
+        printf("Prop: %f ", prop);
+        printf("Size: %f ", prop*width);
+        cairo_move_to(cr, currentWidth, 0);
+        currentWidth += prop*width;
+        cairo_line_to(cr, currentWidth, 0);
+
+        cairo_set_line_width (cr, 30.0);
+        cairo_set_source_rgb(cr, test[i].red, test[i].green, test[i].blue);
+        cairo_stroke(cr);
+    }
+    printf("Test\n");
+
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     srand(time(NULL));
     gtk_init(&argc, &argv);
@@ -295,6 +377,7 @@ int main(int argc, char *argv[]) {
     g_signal_connect(spinW, "value-changed", G_CALLBACK(OnWChanged), NULL);
 
     //Opciones de variantes
+    /*
     GtkRadioButton* radioBasic = GTK_RADIO_BUTTON(gtk_builder_get_object(builder, "radio_basic"));
     g_signal_connect(radioBasic, "toggled", G_CALLBACK(OnVariantChanged), BASIC);
 
@@ -306,6 +389,14 @@ int main(int argc, char *argv[]) {
 
     GtkRadioButton* radioGEL = GTK_RADIO_BUTTON(gtk_builder_get_object(builder, "radio_ge_limited"));
     g_signal_connect(radioGEL, "toggled", G_CALLBACK(OnVariantChanged), GEL);
+    */
+
+   //InputModelDrawing
+   InputArea = GTK_DRAWING_AREA(gtk_builder_get_object(builder, "InputArea"));
+   g_signal_connect(G_OBJECT(InputArea), "draw", G_CALLBACK(drawInput), NULL);
+
+   //InputModelLabel
+    InputLabel = GTK_LABEL(gtk_builder_get_object(builder, "BPIModel"));
 
     //Rango de resultado
     rangeBox = GTK_BOX(gtk_builder_get_object(builder, "RangeBox"));
@@ -328,6 +419,7 @@ int main(int argc, char *argv[]) {
     gtk_widget_show_all(window);
     gtk_widget_set_visible(rangeBox, false);
     gtk_widget_show_all(valueBox);
+    gtk_widget_queue_draw(GTK_WIDGET(InputArea));
     gtk_main();
     return 0;
 }
