@@ -4,108 +4,57 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <limits.h>
+#include <math.h>
 #include "backtracking.c"
 
-enum Variant {
-  BASIC,
-  RANGE,
-  GE,
-  GEL
-}; 
+#define M_PI 3.14159265358979323846 
 
-enum Variant currentVariant = BASIC;
-
+// Variables globales
 GtkFlowBox* valueBox = NULL;
 GtkBox* resultBox = NULL;
 GtkBox* rangeBox = NULL;
 GtkSpinButton* spinRange = NULL;
 GtkScrolledWindow* scrollBox = NULL;
 GtkLabel* resultsLabel = NULL;
-
 GtkDrawingArea* InputArea = NULL;
 GtkLabel* InputLabel = NULL;
 
-void UpdateModel(){
-    int Total = 0;
+// Prototipos de funciones
+void UpdateModel();
+void LoadNumbers();
+void show_coalitions_text(GtkBox *container);
+void show_coalitions_graphic(GtkBox *container, int total_votes);
+static gboolean on_draw_coalition(GtkWidget *widget, cairo_t *cr, gpointer user_data);
 
-    for(int i=0; i<n; i++){
-        printf("%d", w[i]);
-        Total+=w[i];
+void UpdateModel() {
+    int Total = 0;
+    for(int i = 0; i < n; i++) {
+        Total += w[i];
     }
-    char Model[100];
-    sprintf(Model, "K(%d;", Total);
     
-    for(int i=0; i<n; i++){
+    char Model[100];
+    sprintf(Model, "Modelo: (%d;", W);
+    
+    for(int i = 0; i < n; i++) {
         char voter[10];
-        if (i >= n-1){
-            sprintf(voter, " %d", w[i]);
-        }
-        else{
-            sprintf(voter, " %d,", w[i]);
-        }
+        sprintf(voter, " %d%c", w[i], (i == n-1) ? ')' : ',');
         strcat(Model, voter);
     }
-    strcat(Model, ")");
 
     gtk_label_set_text(InputLabel, Model);
 }
 
-GtkBox* generate_row(){
-    GtkBox* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
-    int counter = 0;
-    for (int i = 0; i<n; i++){
-        GtkCheckButton* button = gtk_check_button_new();
-        char name[100];
-        sprintf(name, "a%d: %d", i, w[i]);
-        GtkLabel* label = gtk_label_new(name);
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), include[i]);
-        //printf("%d, ", include[i]);
-        gtk_box_pack_start(box, label, true, true, 2);
-        gtk_box_pack_start(box, button, true, true, 2);
-
-        if (include[i]){
-            counter += w[i];
-        }
-    }
-
-    char total[100];
-    sprintf(total, "Total: %d", counter);
-    GtkLabel* totalLabel = gtk_label_new(total);
-    gtk_box_pack_start(box, totalLabel, true, true, 2);
-    //printf("\n");
-    
-    return box;
-}
-
-void writeSolution(){
-    //printf("NewSolution\n");
-    GtkBox* NewSolution = generate_row();
-    gtk_box_pack_start(resultBox, NewSolution, true, true, 2);
-    //gtk_flow_box_insert(resultBox, NewSolution, -1);
-    gtk_widget_show_all(resultBox);
-}
-
-void LoadNumbers(){
+void LoadNumbers() {
     int i = 0;
     memset(w, 0, sizeof(int) * n);
 
-    GList *children, *iter;
-    children = gtk_container_get_children(GTK_CONTAINER(valueBox));
-    for(iter = children; iter != NULL; iter = g_list_next(iter)){
-        GtkFlowBoxChild* child = GTK_FLOW_BOX_CHILD(iter->data);
-        GtkSpinButton* Button = GTK_SPIN_BUTTON(gtk_bin_get_child(child));
-        int num = gtk_spin_button_get_value_as_int(Button);
-        w[i] = num;
-        i++;
+    GList *children = gtk_container_get_children(GTK_CONTAINER(valueBox));
+    for(GList *iter = children; iter != NULL; iter = g_list_next(iter)) {
+        GtkSpinButton* Button = GTK_SPIN_BUTTON(gtk_bin_get_child(GTK_BIN(iter->data)));
+        w[i++] = gtk_spin_button_get_value_as_int(Button);
     }
     g_list_free(children);
-
-    /*
-    for (int i=0; i<n; i++){
-        printf("%d, ", w[i]);
-    }
-    printf("\n");
-    */
 }
 
 void ClampRange(){
@@ -122,86 +71,12 @@ void ClampRange(){
     }
 }
 
-int Test() {  // SE PUEDE ELIMINAR ESTO, SOLO ES PARA PRUEBAS
-    int option;
-    int total;
-    
-    printf("Ingrese la cantidad de numeros: ");
-    scanf("%d", &n);
-    
-    printf("Ingrese los %d numeros:\n", n);
-    for (int i = 0; i < n; i++) {
-        scanf("%d", &w[i]);
-    }
-    
-    sort_descending();
-    
-    printf("Ingrese W: ");
-    scanf("%d", &W);
-    
-    total = 0;
-    for (int i = 0; i < n; i++) {
-        total += w[i];
-    }
-    
-    while (1) {
-        printf("\nMenu:\n");
-        printf("1. Suma exacta W\n");
-        printf("2. Suma en rango [W-Δ, W+Δ]\n");
-        printf("3. Suma mayor o igual a W (sin acotar)\n");
-        printf("4. Suma mayor o igual a W (acotada)\n");
-        printf("5. Salir\n");
-        printf("Seleccione una opcion: ");
-        scanf("%d", &option);
-        
-        if (option == 5) break;
-        
-        // Reiniciar contadores
-        total_nodes = 0;
-        solution_count = 0;
-        memset(include, 0, sizeof(int) * n);
-        
-        switch (option) {
-            case 1:
-                printf("\nSoluciones con suma exacta %d:\n", W);
-                subset_sum_exact(0, 0, total);
-                break;
-                
-            case 2:
-                printf("Ingrese Δ (delta): ");
-                scanf("%d", &delta);
-                printf("\nSoluciones con suma en [%d, %d]:\n", W-delta, W+delta);
-                subset_sum_range(0, 0, total);
-                break;
-                
-            case 3:
-                printf("\nSoluciones con suma >= %d:\n", W);
-                subset_sum_ge(0, 0, total);
-                break;
-                
-            case 4:
-                printf("\nSoluciones con suma >= %d (acotadas):\n", W);
-                subset_sum_ge_bounded(0, 0, total);
-                break;
-                
-            default:
-                printf("Opcion no valida.\n");
-        }
-        
-        printf("\nTotal de soluciones encontradas: %d\n", solution_count);
-        printf("Total de nodos visitados: %d\n", total_nodes);
-    }
-    
-    return 0;
-}
-
 void OnSetChanged(GtkSpinButton* Button, gpointer UserData){
     LoadNumbers();
     ClampRange();
     UpdateModel();
 
     int value = gtk_spin_button_get_value_as_int(spinRange);
-    delta = value;
     gtk_widget_queue_draw(GTK_WIDGET(InputArea));
     //printf("NewRange: %d\n", delta);
 }
@@ -228,84 +103,14 @@ void OnNChanged(GtkSpinButton* Button, gpointer UserData){
     gtk_widget_show_all(valueBox);
 }
 
-void OnWChanged(GtkSpinButton* Button, gpointer UserData){
-    int value = gtk_spin_button_get_value_as_int(Button);   
-    W = value;
-}
-
-void OnRangeChanged(GtkSpinButton* Button, gpointer UserData){
-    ClampRange();
-    int value = gtk_spin_button_get_value_as_int(Button);
-    delta = value;
-    //printf("NewRange: %d\n", delta);
-}
-
-void OnVariantChanged(GtkRadioButton* Button, gpointer UserData){
-    bool Test = gtk_toggle_button_get_active(Button);
-    if (!Test) return;
-
-    if ((int)UserData == 1){
-        gtk_widget_set_visible(rangeBox, true);
-    }else{
-        gtk_widget_set_visible(rangeBox, false);
-    }
-    currentVariant = (enum Variant)UserData;
-    //printf("%s - %d \n", gtk_button_get_label(Button), currentVariant);
-}
-
-void onBeginExecute(GtkButton* Button, gpointer UserData){
-    //printf("---------------StartNewSolution-----------------");
-    LoadNumbers();
-
-    int total = 0;
-    for (int i = 0; i < n; i++) {
-        total += w[i];
-    }
-
-    GList *children, *iter;
-
-    children = gtk_container_get_children(GTK_CONTAINER(resultBox));
-    for(iter = children; iter != NULL; iter = g_list_next(iter))
-      gtk_widget_destroy(GTK_WIDGET(iter->data));
-    g_list_free(children);
-
-    solution_count = 0;
-    total_nodes = 0;
-
-    switch (currentVariant)
-    {
-    case BASIC:
-        /* code */
-        subset_sum_exact(0, 0, total);
-        break;
-    case RANGE:
-        /* code */
-        subset_sum_range(0, 0, total);
-        break;
-    case GE:
-        /* code */
-        subset_sum_ge(0, 0, total);
-        break;
-    case GEL:
-        /* code */
-        subset_sum_ge_bounded(0, 0, total);
-        break;
-    default:
-        break;
-    }
-
-    gtk_widget_show_all(scrollBox);
-    char results[100];
-    sprintf(results, "Solutions found: %d | Nodes visited: %d", solution_count, total_nodes);
-    gtk_label_set_text(resultsLabel, results);
-    gtk_widget_show_all(resultsLabel);
-
+void OnWChanged(GtkSpinButton* Button, gpointer UserData) {
+    (void)UserData;
+    W = gtk_spin_button_get_value_as_int(Button);
 }
 
 static gboolean drawInput(GtkWidget *widget, cairo_t *cr) {
 
     GdkRGBA test[] = {
-        {0.0, 0.0, 0.0, 1.0},
         {0.0, 0.0, 1.0, 1.0},
         {0.0, 1.0, 0.0, 1.0},
         {0.0, 1.0, 1.0, 1.0},
@@ -325,13 +130,15 @@ static gboolean drawInput(GtkWidget *widget, cairo_t *cr) {
 
     LoadNumbers();
 
+    
     for(int i=0; i<n; i++){
         printf("%d ", w[i]);
         Total+=w[i];
     }
+
     printf(" %d \n", Total);
-    cairo_set_source_rgb(cr, 1, 1, 1);  // Fondo negro (puedes cambiarlo)
-    cairo_paint(cr);  // Llena toda la superficie con el color de fondo
+    //cairo_set_source_rgb(cr, 0, 0, 0);  // Fondo negro 
+    //cairo_paint(cr);  // Llena toda la superficie con el color de fondo
 
     cairo_move_to(cr,0,0);
     float currentWidth = 0;
@@ -353,72 +160,223 @@ static gboolean drawInput(GtkWidget *widget, cairo_t *cr) {
     return 0;
 }
 
+void onBeginExecute(GtkButton* Button, gpointer UserData) {
+    LoadNumbers();
+    
+    // Validar entrada
+    if (W <= 0) {
+        gtk_label_set_text(resultsLabel, "Error: K debe ser mayor que 0");
+        return;
+    }
+
+    // Limpiar resultados anteriores
+    GList *children = gtk_container_get_children(GTK_CONTAINER(resultBox));
+    for(GList *iter = children; iter != NULL; iter = g_list_next(iter)) {
+        gtk_widget_destroy(GTK_WIDGET(iter->data));
+    }
+    g_list_free(children);
+
+    // Ejecutar algoritmo
+    banzhaf(n, W, w);
+    
+    // Calcular total de votos
+    int total_votes = 0;
+    for (int i = 0; i < n; i++) {
+        total_votes += w[i];
+    }
+    
+    // Mostrar resultados
+    //show_coalitions_text(resultBox);
+    show_coalitions_graphic(resultBox, total_votes);
+    
+    // Mostrar estadísticas
+    int total_critical = 0;
+    int* critical_votes = malloc(n * sizeof(int));
+    banzhaf_get_critical_votes(critical_votes);
+
+    for (int i = 0; i < n; i++) {
+        total_critical += critical_votes[i];
+    }
+    free(critical_votes);
+
+    char results[150];
+    sprintf(results, "Coaliciones encontradas: %d | Total votos críticos: %d", banzhaf_get_solution_count(), total_critical);
+    gtk_label_set_text(resultsLabel, results);
+
+    gtk_widget_show_all(scrollBox);
+}
+
+void show_coalitions_graphic(GtkBox *container, int total_votes) {
+    // Limpiar el contenedor primero
+    GList *children = gtk_container_get_children(GTK_CONTAINER(container));
+    for (GList *iter = children; iter != NULL; iter = g_list_next(iter)) {
+        gtk_widget_destroy(GTK_WIDGET(iter->data));
+    }
+    g_list_free(children);
+
+    int num_coaliciones;
+    Coalicion *coaliciones = banzhaf_get_coalitions(&num_coaliciones);
+
+    for (int i = 0; i < num_coaliciones; i++) {
+        GtkWidget *da = gtk_drawing_area_new();
+        // Hacer que el drawing area se expanda horizontalmente
+        gtk_widget_set_hexpand(da, TRUE);
+        gtk_widget_set_size_request(da, -1, 40);  // Altura fija de 40px
+        
+        g_object_set_data(G_OBJECT(da), "coalicion", &coaliciones[i]);
+        g_object_set_data(G_OBJECT(da), "total_votos", GINT_TO_POINTER(total_votes));
+        
+        g_signal_connect(da, "draw", G_CALLBACK(on_draw_coalition), NULL);
+        gtk_box_pack_start(container, da, FALSE, FALSE, 5);
+    }
+    
+    // Forzar el redibujado
+    gtk_widget_show_all(GTK_WIDGET(container));
+}
+
+static gboolean on_draw_coalition(GtkWidget *widget, cairo_t *cr, gpointer user_data) {
+    Coalicion *c = (Coalicion *)g_object_get_data(G_OBJECT(widget), "coalicion");
+    int total_votes = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "total_votos"));
+
+    int width = gtk_widget_get_allocated_width(widget);
+    int height = gtk_widget_get_allocated_height(widget);
+
+    // Colores para los votantes
+    GdkRGBA colors[] = {
+        {0.0, 0.0, 1.0, 1.0},
+        {0.0, 1.0, 0.0, 1.0},
+        {0.0, 1.0, 1.0, 1.0},
+        {1.0, 0.0, 0.0, 1.0},
+        {1.0, 0.0, 1.0, 1.0},
+        {1.0, 1.0, 0.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0},
+        {1.0, 1.0, 0.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0},
+        {1.0, 1.0, 0.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0}
+    };
+
+    // Dibujar fondo blanco
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_paint(cr);
+
+    // Dibujar los segmentos de votos
+    double current_x = 0;
+    for (int i = 0; i < c->size; i++) {
+        if (c->votos[i] > 0) {
+            double segment_width = (double)width * c->votos[i] / total_votes;
+            
+            // Dibujar rectángulo relleno
+            cairo_rectangle(cr, current_x, 0, segment_width, height);
+            cairo_set_source_rgb(cr, colors[i%6].red, colors[i%6].green, colors[i%6].blue);
+            cairo_fill_preserve(cr);
+            
+            // Dibujar borde negro
+            cairo_set_source_rgb(cr, 0, 0, 0);
+            cairo_set_line_width(cr, 1.0);
+            cairo_stroke(cr);
+
+            // Marcar votante crítico con estrella negra
+            if (c->criticos[i]) {
+                cairo_save(cr);
+                cairo_set_source_rgb(cr, 0, 0, 0);
+                
+                double star_size = fmin(segment_width, height) * 0.2;
+                double center_x = current_x + segment_width/2;
+                double center_y = height/2;
+                
+                // Dibujar estrella de 5 puntas
+                for (int j = 0; j < 5; j++) {
+                    double angle = 2.0 * M_PI * j / 5.0 - M_PI/2.0;
+                    double x = center_x + cos(angle) * star_size;
+                    double y = center_y + sin(angle) * star_size;
+                    
+                    if (j == 0) cairo_move_to(cr, x, y);
+                    else cairo_line_to(cr, x, y);
+                    
+                    angle += 2.0 * M_PI / 10.0;
+                    x = center_x + cos(angle) * (star_size * 0.4);
+                    y = center_y + sin(angle) * (star_size * 0.4);
+                    cairo_line_to(cr, x, y);
+                }
+                cairo_close_path(cr);
+                cairo_fill(cr);
+                cairo_restore(cr);
+            }
+            
+            current_x += segment_width;
+        }
+    }
+
+    return FALSE;
+}
+
+    // Mostrar estadísticas en la parte inferior
+    /*
+    cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 10);
+    
+    char stats[100];
+    snprintf(stats, sizeof(stats), "Votos críticos totales: %d", total_criticos);
+    cairo_move_to(cr, 5, height - 5);
+    cairo_show_text(cr, stats);
+    */
+
+
+
 int main(int argc, char *argv[]) {
-    srand(time(NULL));
+    // Inicialización
     gtk_init(&argc, &argv);
-    reportSolution = &writeSolution;
-
+    
+    // Cargar interfaz desde Glade
     GtkBuilder* builder = gtk_builder_new_from_file("interface.glade");
+    if (!builder) {
+        g_error("Error al cargar el archivo interface.glade");
+        return 1;
+    }
 
-    // Ventana principal
+    // Obtener widgets de la interfaz
     GtkWidget* window = GTK_WIDGET(gtk_builder_get_object(builder, "Window"));
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
-    //Miembros del conjunto
+    // Configurar widgets importantes
     valueBox = GTK_FLOW_BOX(gtk_builder_get_object(builder, "value_box"));
-
-    //Tamaño del conjunto
-    GtkSpinButton* spinN = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "spin_n"));
-    g_signal_connect(spinN, "value-changed", G_CALLBACK(OnNChanged), NULL);
-
-    //Número objetivo (W)
-    GtkSpinButton* spinW = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "spin_W"));
-    g_signal_connect(spinW, "value-changed", G_CALLBACK(OnWChanged), NULL);
-
-    //Opciones de variantes
-    /*
-    GtkRadioButton* radioBasic = GTK_RADIO_BUTTON(gtk_builder_get_object(builder, "radio_basic"));
-    g_signal_connect(radioBasic, "toggled", G_CALLBACK(OnVariantChanged), BASIC);
-
-    GtkRadioButton* radioRange = GTK_RADIO_BUTTON(gtk_builder_get_object(builder, "radio_range"));
-    g_signal_connect(radioRange, "toggled", G_CALLBACK(OnVariantChanged), RANGE);
-
-    GtkRadioButton* radioGE = GTK_RADIO_BUTTON(gtk_builder_get_object(builder, "radio_ge"));
-    g_signal_connect(radioGE, "toggled", G_CALLBACK(OnVariantChanged), GE);
-
-    GtkRadioButton* radioGEL = GTK_RADIO_BUTTON(gtk_builder_get_object(builder, "radio_ge_limited"));
-    g_signal_connect(radioGEL, "toggled", G_CALLBACK(OnVariantChanged), GEL);
-    */
-
-   //InputModelDrawing
-   InputArea = GTK_DRAWING_AREA(gtk_builder_get_object(builder, "InputArea"));
-   g_signal_connect(G_OBJECT(InputArea), "draw", G_CALLBACK(drawInput), NULL);
-
-   //InputModelLabel
+    resultBox = GTK_BOX(gtk_builder_get_object(builder, "ResultBox"));
+    scrollBox = GTK_SCROLLED_WINDOW(gtk_builder_get_object(builder, "scrollBox"));
+    resultsLabel = GTK_LABEL(gtk_builder_get_object(builder, "lbl_results"));
+    InputArea = GTK_DRAWING_AREA(gtk_builder_get_object(builder, "InputArea"));
     InputLabel = GTK_LABEL(gtk_builder_get_object(builder, "BPIModel"));
 
-    //Rango de resultado
-    rangeBox = GTK_BOX(gtk_builder_get_object(builder, "RangeBox"));
+    // Configurar spin buttons
+    GtkSpinButton* spinN = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "spin_n"));
+    GtkSpinButton* spinW = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "spin_W"));
     spinRange = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "Range"));
-    g_signal_connect(spinRange, "value-changed", G_CALLBACK(OnRangeChanged), NULL);
+    rangeBox = GTK_BOX(gtk_builder_get_object(builder, "RangeBox"));
 
-    //Boton de Ejecutar
+    // Conectar señales
+    g_signal_connect(spinN, "value-changed", G_CALLBACK(OnNChanged), NULL);
+    g_signal_connect(spinW, "value-changed", G_CALLBACK(OnWChanged), NULL);
+    //g_signal_connect(spinRange, "value-changed", G_CALLBACK(OnRangeChanged), NULL);
+    g_signal_connect(InputArea, "draw", G_CALLBACK(drawInput), NULL);
+
+    // Configurar botón de ejecución
     GtkButton* buttonExecute = GTK_BUTTON(gtk_builder_get_object(builder, "btn_execute"));
-    g_signal_connect(buttonExecute, "pressed", G_CALLBACK(onBeginExecute), NULL);
+    g_signal_connect(buttonExecute, "clicked", G_CALLBACK(onBeginExecute), NULL);
 
-    //Resultados
-    resultBox = GTK_BOX(gtk_builder_get_object(builder, "ResultBox"));
-    resultsLabel = GTK_LABEL(gtk_builder_get_object(builder, "lbl_results"));
-
-    //scrollBox
-    scrollBox = GTK_SCROLLED_WINDOW(gtk_builder_get_object(builder, "scrollBox"));
-
-    OnNChanged(spinN, NULL);
-
+    // Inicializar interfaz
+    OnNChanged(spinN, NULL);  // Configura los spin buttons iniciales
+    gtk_widget_set_visible(rangeBox, FALSE);  // Ocultar rango (no usado en este proyecto)
+    
+    // Mostrar ventana principal
     gtk_widget_show_all(window);
-    gtk_widget_set_visible(rangeBox, false);
-    gtk_widget_show_all(valueBox);
-    gtk_widget_queue_draw(GTK_WIDGET(InputArea));
+    gtk_widget_queue_draw(InputArea);  // Forzar redibujado del área de entrada
+
+    // Liberar builder después de usar
+    g_object_unref(builder);
+
+    // Bucle principal de GTK
     gtk_main();
+
     return 0;
 }
