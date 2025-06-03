@@ -97,6 +97,7 @@ void OnNChanged(GtkSpinButton* Button, gpointer UserData){
         GtkAdjustment* adjustment = gtk_adjustment_new (1.0, 0.0, 1000000000000000000, 1.0, 5.0, 0.0);
         GtkSpinButton* newButton = gtk_spin_button_new(adjustment, 1, 0);
         g_signal_connect(newButton, "value-changed", G_CALLBACK(OnSetChanged), NULL);
+        OnSetChanged(newButton, NULL);
         gtk_flow_box_insert(valueBox, newButton, 0);
     }
 
@@ -108,6 +109,7 @@ void OnNChanged(GtkSpinButton* Button, gpointer UserData){
 void OnWChanged(GtkSpinButton* Button, gpointer UserData) {
     (void)UserData;
     W = gtk_spin_button_get_value_as_int(Button);
+    UpdateModel();
 }
 
 static gboolean drawInput(GtkWidget *widget, cairo_t *cr) {
@@ -132,7 +134,6 @@ static gboolean drawInput(GtkWidget *widget, cairo_t *cr) {
     int Total = 0;
 
     LoadNumbers();
-
     
     for(int i=0; i<n; i++){
         printf("%d ", w[i]);
@@ -154,7 +155,7 @@ static gboolean drawInput(GtkWidget *widget, cairo_t *cr) {
         currentWidth += prop*width;
         cairo_line_to(cr, currentWidth, 0);
 
-        cairo_set_line_width (cr, 30.0);
+        cairo_set_line_width (cr, 100);
         cairo_set_source_rgb(cr, test[i].red, test[i].green, test[i].blue);
         cairo_stroke(cr);
     }
@@ -477,12 +478,12 @@ int main(int argc, char *argv[]) {
 
     // Inicializar interfaz
     OnNChanged(spinN, NULL);  // Configura los spin buttons iniciales
+    OnWChanged(spinW, NULL);  // Configura los spin buttons iniciales
     gtk_widget_set_visible(rangeBox, FALSE);  // Ocultar rango (no usado en este proyecto)
     
     // Mostrar ventana principal
     gtk_widget_show_all(window);
     gtk_widget_queue_draw(InputArea);  // Forzar redibujado del área de entrada
-
     // Liberar builder después de usar
     g_object_unref(builder);
 
