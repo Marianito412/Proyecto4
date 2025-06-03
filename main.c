@@ -118,7 +118,7 @@ static gboolean drawInput(GtkWidget *widget, cairo_t *cr) {
         {0.16, 0.49, 0.82, 1.0},  // 1. Azul vibrante
         {0.89, 0.29, 0.30, 1.0},  // 2. Rojo intenso
         {0.30, 0.69, 0.31, 1.0},  // 3. Verde esmeralda
-        {0.99, 0.76, 0.15, 1.0},  // 4. Amarillo dorado
+        {0.49, 0.35, 0.09, 1.0},  // 4. Cobre oscuro 
         {0.61, 0.31, 0.71, 1.0},  // 5. Púrpura real
         {0.09, 0.75, 0.81, 1.0},  // 6. Turquesa brillante
         {0.95, 0.52, 0.13, 1.0},  // 7. Naranja fuego
