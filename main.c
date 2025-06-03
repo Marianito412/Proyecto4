@@ -256,10 +256,6 @@ static gboolean on_draw_coalition(GtkWidget *widget, cairo_t *cr, gpointer user_
         {1.0, 1.0, 1.0, 1.0}
     };
 
-    // Dibujar fondo blanco
-    cairo_set_source_rgb(cr, 1, 1, 1);
-    cairo_paint(cr);
-
     // Dibujar los segmentos de votos
     double current_x = 0;
     for (int i = 0; i < c->size; i++) {
