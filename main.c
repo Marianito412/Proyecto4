@@ -26,6 +26,8 @@ void LoadNumbers();
 void show_coalitions_text(GtkBox *container);
 void show_coalitions_graphic(GtkBox *container, int total_votes);
 static gboolean on_draw_coalition(GtkWidget *widget, cairo_t *cr, gpointer user_data);
+static void setup_ipb_labels(GtkWidget *da, GdkRectangle *allocation, gpointer user_data);
+
 
 void UpdateModel() {
     int Total = 0;
@@ -247,51 +249,103 @@ void show_coalitions_graphic(GtkBox *container, int total_votes) {
         gtk_box_pack_start(GTK_BOX(coalitionBox), da, FALSE, FALSE, 0);
         
         // Contenedor para IPBs
-        GtkWidget *ipbContainer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+        GtkWidget *ipbContainer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0); // Sin espaciado
         gtk_widget_set_margin_top(ipbContainer, 5);
         gtk_widget_set_margin_bottom(ipbContainer, 5);
         
-        // Calcular ancho por votante
-        double segment_width = (double)gtk_widget_get_allocated_width(da) / total_votes;
-        
-        // Mostrar IPB para cada votante en la coalición
-        for (int j = 0; j < coaliciones[i].size; j++) {
-            if (coaliciones[i].votos[j] > 0) {
-                GtkWidget *ipbFrame = gtk_frame_new(NULL);
-                gtk_frame_set_shadow_type(GTK_FRAME(ipbFrame), GTK_SHADOW_ETCHED_IN);
-                
-                char ipb_text[50];
-                snprintf(ipb_text, sizeof(ipb_text), "%.4f\n(%d/%d)", 
-                        power_index[j], critical_votes[j], total_critical);
-                
-                GtkWidget *ipbLabel = gtk_label_new(ipb_text);
-                gtk_label_set_xalign(GTK_LABEL(ipbLabel), 0.5);
-                gtk_widget_set_size_request(ipbLabel, 
-                                          coaliciones[i].votos[j] * segment_width, -1);
-                
-                // Aplicar estilo
-                GtkCssProvider *provider = gtk_css_provider_new();
-                gtk_css_provider_load_from_data(provider,
-                    "label {"
-                    "  font-family: Monospace;"
-                    "  font-size: 10px;"
-                    "  padding: 2px;"
-                    "}", -1, NULL);
-                
-                GtkStyleContext *context = gtk_widget_get_style_context(ipbLabel);
-                gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(provider), 
-                                             GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-                
-                gtk_container_add(GTK_CONTAINER(ipbFrame), ipbLabel);
-                gtk_box_pack_start(GTK_BOX(ipbContainer), ipbFrame, TRUE, TRUE, 0);
-            }
-        }
+        // Conectar señal para configurar los IPBs después de que se asigne el tamaño
+        g_signal_connect(da, "size-allocate", G_CALLBACK(setup_ipb_labels), ipbContainer);
+        g_object_set_data(G_OBJECT(da), "ipb_container", ipbContainer);
+        g_object_set_data(G_OBJECT(da), "total_votes", GINT_TO_POINTER(total_votes));
         
         gtk_box_pack_start(GTK_BOX(coalitionBox), ipbContainer, FALSE, FALSE, 0);
         gtk_box_pack_start(container, coalitionBox, FALSE, FALSE, 5);
     }
     
     gtk_widget_show_all(container);
+}
+
+// Nueva función para configurar las etiquetas IPB después de conocer el tamaño
+static void setup_ipb_labels(GtkWidget *da, GdkRectangle *allocation, gpointer user_data) {
+    GtkWidget *ipbContainer = GTK_WIDGET(user_data);
+    Coalicion *c = (Coalicion *)g_object_get_data(G_OBJECT(da), "coalicion");
+    int total_votes = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(da), "total_votes"));
+    
+    // Obtener datos de votos críticos y calcular IPB
+    int critical_votes[MAX_N];
+    banzhaf_get_critical_votes(critical_votes);
+    int total_critical = 0;
+    for (int i = 0; i < n; i++) {
+        total_critical += critical_votes[i];
+    }
+    
+    double power_index[MAX_N];
+    for (int i = 0; i < n; i++) {
+        power_index[i] = total_critical > 0 ? 
+                       (double)critical_votes[i] / total_critical : 0.0;
+    }
+
+    // Limpiar el contenedor primero
+    GList *children = gtk_container_get_children(GTK_CONTAINER(ipbContainer));
+    for (GList *iter = children; iter != NULL; iter = g_list_next(iter)) {
+        gtk_widget_destroy(GTK_WIDGET(iter->data));
+    }
+    g_list_free(children);
+
+    // Obtener el ancho disponible
+    int available_width = allocation->width;
+    double votes_per_pixel = (double)total_votes / available_width;
+
+    // Crear etiquetas para cada votante
+    for (int j = 0; j < c->size; j++) {
+        if (c->votos[j] > 0) {
+            // Calcular ancho en píxeles
+            int pixel_width = (int)(c->votos[j] / votes_per_pixel);
+            pixel_width = MAX(pixel_width, 1);
+
+            GtkWidget *frame = gtk_frame_new(NULL);
+            gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_ETCHED_IN);
+            gtk_widget_set_size_request(frame, pixel_width, -1);
+
+            GtkWidget *label = gtk_label_new(NULL);
+            gtk_label_set_xalign(GTK_LABEL(label), 0.5);
+            
+            if (pixel_width > 50) {
+                char ipb_text[50];
+                snprintf(ipb_text, sizeof(ipb_text), "%.4f\n(%d/%d)", 
+                        power_index[j], critical_votes[j], total_critical);
+                gtk_label_set_text(GTK_LABEL(label), ipb_text);
+            }
+
+            // Configurar estilo
+            GtkCssProvider *provider = gtk_css_provider_new();
+            gtk_css_provider_load_from_data(provider,
+                "frame {"
+                "   background: transparent;"
+                "   border: none;"
+                "   margin: 0;"
+                "   padding: 0;"
+                "}"
+                ""
+                "label {"
+                "   font-family: 'Segoe UI', Roboto, sans-serif;"
+                "   font-size: 11px;"
+                "   font-weight: bold;"
+                "   color: white;"
+                "   padding: 2px 4px;"
+                "   text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"
+                "}", -1, NULL);
+            
+            GtkStyleContext *context = gtk_widget_get_style_context(label);
+            gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(provider), 
+                                         GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+            gtk_container_add(GTK_CONTAINER(frame), label);
+            gtk_box_pack_start(GTK_BOX(ipbContainer), frame, FALSE, FALSE, 0);
+        }
+    }
+    
+    gtk_widget_show_all(ipbContainer);
 }
 
 static gboolean on_draw_coalition(GtkWidget *widget, cairo_t *cr, gpointer user_data) {
