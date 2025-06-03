@@ -112,6 +112,18 @@ static void backtrack(int i, int current_sum, int remaining) {
     backtrack(i + 1, current_sum, remaining - w[i]);
 }
 
+void calculate_ipb(double ipb[n]) {
+    int total_criticos = 0;
+    for (int i = 0; i < n; i++) {
+        total_criticos += critical_votes[i];
+    }
+
+    for (int i = 0; i < n; i++) {
+        ipb[i] = (total_criticos > 0) ? 
+                (double)critical_votes[i] / total_criticos : 0.0;
+    }
+}
+
 void banzhaf(int num_voters, int quota, int* weights) {
     // Validación de entrada
     if (num_voters < 3 || num_voters > MAX_N || quota <= 0) {
@@ -141,27 +153,10 @@ void banzhaf(int num_voters, int quota, int* weights) {
     backtrack(0, 0, total_votos);
 }
 
-// Función para calcular el IPB
-static void calculate_ipb(double ipb[n]) {
-    int total_criticos = 0;
-    for (int i = 0; i < n; i++) {
-        total_criticos += critical_votes[i];
-    }
-
-    for (int i = 0; i < n; i++) {
-        ipb[i] = (total_criticos > 0) ? 
-                (double)critical_votes[i] / total_criticos : 0.0;
-    }
-}
-
-// Función para obtener ambos resultados
 void banzhaf_get_results(int* out_critical_votes, double* out_ipb) {
-    if (out_critical_votes != NULL) {
+    calculate_ipb(out_ipb);
+    if (out_critical_votes) {
         memcpy(out_critical_votes, critical_votes, n * sizeof(int));
-    }
-    
-    if (out_ipb != NULL) {
-        calculate_ipb(out_ipb);
     }
 }
 
